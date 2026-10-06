@@ -39,29 +39,41 @@ export function saveYearbooks(books: Yearbook[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
 }
 
-/** Render a placeholder scanned page as a data URL using a canvas. */
+const ACCENT_COLORS = ["#0b3d2e", "#7a2e2e", "#2e4a7a", "#7a6a2e", "#5a2e7a"];
+
+/** Render a placeholder scanned page as a data URL using a canvas. Each call
+ * picks a random accent color and timestamp so a recaptured page is visibly
+ * different from the one it replaced, even though it's still mock content. */
 export function makePageImage(book: Yearbook, pageNumber: number): string {
   const canvas = document.createElement("canvas");
   canvas.width = 612;
   canvas.height = 792; // letter ratio
   const ctx = canvas.getContext("2d")!;
+  const accent: string =
+    ACCENT_COLORS[Math.floor(Math.random() * ACCENT_COLORS.length)] ?? "#0b3d2e";
 
   // paper
   ctx.fillStyle = "#fdfdf8";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // border frame
-  ctx.strokeStyle = "#0b3d2e";
+  ctx.strokeStyle = accent;
   ctx.lineWidth = 6;
   ctx.strokeRect(24, 24, canvas.width - 48, canvas.height - 48);
 
   // header
-  ctx.fillStyle = "#0b3d2e";
+  ctx.fillStyle = accent;
   ctx.font = "bold 34px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.fillText(book.school, canvas.width / 2, 110);
   ctx.font = "600 26px system-ui, sans-serif";
   ctx.fillText(String(book.year), canvas.width / 2, 152);
+
+  // timestamp, placed near the top (clear of the bottom status bar overlay
+  // shown in the Review screen's thumbnail grid) so it's always visible
+  ctx.fillStyle = "#8a8f8a";
+  ctx.font = "500 16px system-ui, sans-serif";
+  ctx.fillText(`captured ${new Date().toLocaleTimeString()}`, canvas.width / 2, 185);
 
   // faux content lines
   ctx.strokeStyle = "#c9cec9";
@@ -75,7 +87,7 @@ export function makePageImage(book: Yearbook, pageNumber: number): string {
   }
 
   // big page number
-  ctx.fillStyle = "#0b3d2e";
+  ctx.fillStyle = accent;
   ctx.font = "bold 96px system-ui, sans-serif";
   ctx.fillText(`Page ${pageNumber}`, canvas.width / 2, 700);
 

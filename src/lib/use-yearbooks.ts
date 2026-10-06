@@ -53,6 +53,22 @@ export function useYearbooks() {
     [update],
   );
 
+  const recapturePages = useCallback(
+    (id: string, pageIndexes: number[]) => {
+      update((books) =>
+        books.map((b) => {
+          if (b.id !== id || pageIndexes.length === 0) return b;
+          const indexSet = new Set(pageIndexes);
+          const pages = b.pages.map((src, i) =>
+            indexSet.has(i) ? makePageImage(b, i + 1) : src,
+          );
+          return { ...b, pages };
+        }),
+      );
+    },
+    [update],
+  );
+
   const finishBook = useCallback(
     (id: string) => {
       update((books) =>
@@ -73,5 +89,13 @@ export function useYearbooks() {
     [update],
   );
 
-  return { books, claimBook, capturePage, rescanLastPage, finishBook, resetBook };
+  return {
+    books,
+    claimBook,
+    capturePage,
+    rescanLastPage,
+    recapturePages,
+    finishBook,
+    resetBook,
+  };
 }

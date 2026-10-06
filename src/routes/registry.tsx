@@ -54,7 +54,10 @@ function RegistryPage() {
   const doneCount = books.filter((b) => b.status === "done").length;
 
   const handleTap = (id: string, status: YearbookStatus) => {
-    if (status === "done") return;
+    if (status === "done") {
+      navigate({ to: "/complete/$bookId", params: { bookId: id } });
+      return;
+    }
     if (status === "unclaimed") claimBook(id);
     navigate({ to: "/scan/$bookId", params: { bookId: id } });
   };
@@ -88,14 +91,12 @@ function RegistryPage() {
 
       <ul className="mt-6 grid gap-3 sm:grid-cols-2">
         {books.map((book) => {
-          const tappable = book.status !== "done";
           return (
             <li key={book.id}>
               <button
                 type="button"
-                disabled={!tappable}
                 onClick={() => handleTap(book.id, book.status)}
-                className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition-transform enabled:active:scale-[0.98] disabled:opacity-70"
+                className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left shadow-sm transition-transform active:scale-[0.98]"
               >
                 <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-lg font-black text-primary">
                   ’{String(book.year).slice(2)}
@@ -109,9 +110,7 @@ function RegistryPage() {
                     <StatusBadge status={book.status} />
                   </div>
                 </div>
-                {tappable && (
-                  <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
-                )}
+                <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
               </button>
             </li>
           );

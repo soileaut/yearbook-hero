@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { jsPDF } from "jspdf";
-import { ArrowLeft, Download, PartyPopper, Plus } from "lucide-react";
+import { ArrowLeft, Download, ImageIcon, PartyPopper, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useYearbooks } from "@/lib/use-yearbooks";
 
@@ -75,6 +75,13 @@ function CompletePage() {
           <Download className="size-5" />
           {downloading ? "Building PDF…" : "Download PDF"}
         </button>
+        <Link
+          to="/review/$bookId"
+          params={{ bookId: book.id }}
+          className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl border border-border bg-card text-base font-bold text-card-foreground"
+        >
+          <ImageIcon className="size-5" /> Review Pages
+        </Link>
         <Link
           to="/registry"
           className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl border border-border bg-card text-base font-bold text-card-foreground"
