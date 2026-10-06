@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Camera, Flag, Undo2, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Camera, Flag, Loader2, Undo2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useYearbooks } from "@/lib/use-yearbooks";
+import { captureVideoFrame, compressImageFile } from "@/lib/yearbooks";
 
 const scanSearchSchema = z.object({
   // comma-separated page indexes (0-based) queued for recapture, e.g. "2,5,6"
@@ -33,6 +34,52 @@ function ScanPage() {
   const book = books.find((b) => b.id === bookId);
 
   const [popKey, setPopKey] = useState(0);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Live in-browser camera (getUserMedia). Falls back to the hidden file
+  // input below if camera access isn't available/granted (e.g. desktop
+  // testing without a webcam, or a denied permission prompt).
+  const [cameraState, setCameraState] = useState<"starting" | "ready" | "unavailable">(
+    "starting",
+  );
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function start() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraState("unavailable");
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false,
+        });
+        if (!active) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        setCameraState("ready");
+      } catch {
+        if (active) setCameraState("unavailable");
+      }
+    }
+
+    start();
+    return () => {
+      active = false;
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    };
+  }, []);
 
   // Queue of 0-based page indexes being recaptured, in the order selected.
   // Consumed one at a time as the camera button is tapped.
@@ -66,10 +113,13 @@ function ScanPage() {
   const pageCount = book.pages.length;
   const currentTargetIndex = remaining[0];
 
-  const handleCapture = () => {
+  // Shared by both capture paths (live camera frame or file-picker fallback)
+  // — routes the freshly captured image to whichever mode is active:
+  // queue-based recapture, local single-page rescan, or a normal new page.
+  const processCapturedImage = (imageSrc: string) => {
     if (isRecapture) {
       if (currentTargetIndex === undefined) return;
-      recapturePages(book.id, [currentTargetIndex]);
+      recapturePages(book.id, [currentTargetIndex], imageSrc);
       setPopKey((k) => k + 1);
       const next = remaining.slice(1);
       setRemaining(next);
@@ -82,14 +132,51 @@ function ScanPage() {
       return;
     }
     if (isLocalRescan && localRescanIndex !== null) {
-      recapturePages(book.id, [localRescanIndex]);
+      recapturePages(book.id, [localRescanIndex], imageSrc);
       setPopKey((k) => k + 1);
       setLocalRescanIndex(null);
       toast.success(`Page ${localRescanIndex + 1} rescanned`);
       return;
     }
-    capturePage(book.id);
+    capturePage(book.id, imageSrc);
     setPopKey((k) => k + 1);
+  };
+
+  // Camera button: grab a frame from the live preview if it's running,
+  // otherwise fall back to the hidden file input (which on a phone browser
+  // still launches the native camera via capture="environment").
+  const handleCapture = () => {
+    if (cameraState === "ready" && videoRef.current) {
+      setIsProcessing(true);
+      try {
+        const imageSrc = captureVideoFrame(videoRef.current);
+        processCapturedImage(imageSrc);
+      } catch {
+        toast.error("Couldn't capture that frame — try again.");
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset immediately so selecting/retaking the same shot again still fires
+    // onChange next time (mobile browsers won't re-fire for an unchanged value).
+    e.target.value = "";
+    if (!file) return;
+
+    setIsProcessing(true);
+    try {
+      const imageSrc = await compressImageFile(file);
+      processCapturedImage(imageSrc);
+    } catch {
+      toast.error("Couldn't process that photo — try again.");
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleRescanLastPage = () => {
@@ -154,13 +241,59 @@ function ScanPage() {
               : `${pageCount} ${pageCount === 1 ? "page" : "pages"} in the stack`}
         </p>
 
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileSelected}
+          className="hidden"
+        />
+
+        <div
+          className="relative mt-6 w-full max-w-[220px] overflow-hidden rounded-2xl bg-black shadow-lg"
+          style={{ aspectRatio: "612 / 792" }}
+        >
+          {cameraState === "ready" ? (
+            <>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="h-full w-full object-cover"
+              />
+              {/* Alignment guide: box-shadow spread darkens everything
+                  outside this frame, showing where to position the page. */}
+              <div
+                className="pointer-events-none absolute inset-3 rounded-md border-2 border-dashed border-white/80"
+                style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)" }}
+              />
+            </>
+          ) : cameraState === "starting" ? (
+            <div className="flex h-full items-center justify-center px-4 text-center text-xs font-semibold text-white/70">
+              Starting camera…
+            </div>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-xs font-semibold text-white/70">
+              <Camera className="size-6" />
+              Camera unavailable — tap below to choose a photo instead.
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={handleCapture}
-          className="mt-8 grid size-40 place-items-center rounded-full bg-primary text-primary-foreground shadow-2xl ring-8 ring-primary/15 transition-transform active:scale-90"
+          disabled={isProcessing}
+          className="mt-6 grid size-40 place-items-center rounded-full bg-primary text-primary-foreground shadow-2xl ring-8 ring-primary/15 transition-transform active:scale-90 disabled:opacity-60"
           aria-label="Capture page"
         >
-          <Camera className="size-16" />
+          {isProcessing ? (
+            <Loader2 className="size-16 animate-spin" />
+          ) : (
+            <Camera className="size-16" />
+          )}
         </button>
 
         {!isRecapture && !isLocalRescan && (

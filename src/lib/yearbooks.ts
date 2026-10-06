@@ -39,57 +39,96 @@ export function saveYearbooks(books: Yearbook[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
 }
 
-const ACCENT_COLORS = ["#0b3d2e", "#7a2e2e", "#2e4a7a", "#7a6a2e", "#5a2e7a"];
+const MAX_DIMENSION = 1600; // longest edge, px — keeps real phone photos from
+// bloating localStorage; still plenty sharp for an on-screen thumbnail/PDF demo
+const JPEG_QUALITY = 0.72;
 
-/** Render a placeholder scanned page as a data URL using a canvas. Each call
- * picks a random accent color and timestamp so a recaptured page is visibly
- * different from the one it replaced, even though it's still mock content. */
-export function makePageImage(book: Yearbook, pageNumber: number): string {
-  const canvas = document.createElement("canvas");
-  canvas.width = 612;
-  canvas.height = 792; // letter ratio
-  const ctx = canvas.getContext("2d")!;
-  const accent: string =
-    ACCENT_COLORS[Math.floor(Math.random() * ACCENT_COLORS.length)] ?? "#0b3d2e";
+// US Letter portrait ratio (matches the PDF page size in complete.$bookId.tsx).
+// Every captured page is center-cropped to this ratio so pages come out a
+// consistent shape regardless of how the photo was framed — a stand-in for
+// the real auto-edge-detection a production capture flow would do.
+const TARGET_ASPECT = 612 / 792;
 
-  // paper
-  ctx.fillStyle = "#fdfdf8";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // border frame
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 6;
-  ctx.strokeRect(24, 24, canvas.width - 48, canvas.height - 48);
-
-  // header
-  ctx.fillStyle = accent;
-  ctx.font = "bold 34px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText(book.school, canvas.width / 2, 110);
-  ctx.font = "600 26px system-ui, sans-serif";
-  ctx.fillText(String(book.year), canvas.width / 2, 152);
-
-  // timestamp, placed near the top (clear of the bottom status bar overlay
-  // shown in the Review screen's thumbnail grid) so it's always visible
-  ctx.fillStyle = "#8a8f8a";
-  ctx.font = "500 16px system-ui, sans-serif";
-  ctx.fillText(`captured ${new Date().toLocaleTimeString()}`, canvas.width / 2, 185);
-
-  // faux content lines
-  ctx.strokeStyle = "#c9cec9";
-  ctx.lineWidth = 3;
-  for (let y = 220; y < 620; y += 36) {
-    const inset = 70 + ((y * 7) % 60);
-    ctx.beginPath();
-    ctx.moveTo(inset, y);
-    ctx.lineTo(canvas.width - inset, y);
-    ctx.stroke();
+/**
+ * Center-crop a drawable source (an <img> or a live <video> frame) to
+ * TARGET_ASPECT, downscale so its longest edge is at most MAX_DIMENSION, and
+ * return a JPEG data URL. Shared by the file-picker fallback path and the
+ * live in-browser camera path below, so both produce identically-shaped
+ * pages regardless of how the source photo/frame was framed.
+ */
+function cropAndEncode(
+  source: CanvasImageSource,
+  srcWidth: number,
+  srcHeight: number,
+): string {
+  const srcAspect = srcWidth / srcHeight;
+  let cropW = srcWidth;
+  let cropH = srcHeight;
+  let cropX = 0;
+  let cropY = 0;
+  if (srcAspect > TARGET_ASPECT) {
+    // source is relatively wider than the target page — crop the sides
+    cropW = srcHeight * TARGET_ASPECT;
+    cropX = (srcWidth - cropW) / 2;
+  } else {
+    // source is relatively taller than the target page — crop top/bottom
+    cropH = srcWidth / TARGET_ASPECT;
+    cropY = (srcHeight - cropH) / 2;
   }
 
-  // big page number
-  ctx.fillStyle = accent;
-  ctx.font = "bold 96px system-ui, sans-serif";
-  ctx.fillText(`Page ${pageNumber}`, canvas.width / 2, 700);
+  const scale = Math.min(1, MAX_DIMENSION / Math.max(cropW, cropH));
+  const outW = Math.round(cropW * scale);
+  const outH = Math.round(cropH * scale);
 
-  return canvas.toDataURL("image/jpeg", 0.85);
+  const canvas = document.createElement("canvas");
+  canvas.width = outW;
+  canvas.height = outH;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas 2D context unavailable");
+  }
+  ctx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, outW, outH);
+  return canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+}
+
+/**
+ * Load an image File (from a picked file, used as a fallback when live
+ * camera access isn't available), center-crop it to a fixed page aspect
+ * ratio, downscale, re-encode as JPEG, and return a data URL.
+ *
+ * Two things this solves:
+ * 1. Storage size — without downscaling, full-resolution phone photos would
+ *    quickly exceed localStorage's quota after just a few pages.
+ * 2. Visual consistency — without the crop, pages captured at different
+ *    zoom/framing come out different shapes, which looks inconsistent and
+ *    distorts when placed into the PDF.
+ */
+export function compressImageFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      try {
+        resolve(cropAndEncode(img, img.width, img.height));
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error("Failed to process image"));
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Failed to load captured image"));
+    };
+    img.src = objectUrl;
+  });
+}
+
+/**
+ * Capture the current frame of a live <video> element (from getUserMedia),
+ * cropped/scaled/encoded the same way as compressImageFile. Used by the
+ * in-browser camera capture flow.
+ */
+export function captureVideoFrame(video: HTMLVideoElement): string {
+  return cropAndEncode(video, video.videoWidth, video.videoHeight);
 }

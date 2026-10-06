@@ -1,10 +1,5 @@
 import { useCallback, useState } from "react";
-import {
-  loadYearbooks,
-  saveYearbooks,
-  makePageImage,
-  type Yearbook,
-} from "./yearbooks";
+import { loadYearbooks, saveYearbooks, type Yearbook } from "./yearbooks";
 
 export function useYearbooks() {
   const [books, setBooks] = useState<Yearbook[]>(() => loadYearbooks());
@@ -26,42 +21,29 @@ export function useYearbooks() {
     [update],
   );
 
+  /** Append a newly captured (and already compressed) page image to a book. */
   const capturePage = useCallback(
-    (id: string) => {
+    (id: string, imageSrc: string) => {
       update((books) =>
         books.map((b) =>
-          b.id === id
-            ? { ...b, pages: [...b.pages, makePageImage(b, b.pages.length + 1)] }
-            : b,
+          b.id === id ? { ...b, pages: [...b.pages, imageSrc] } : b,
         ),
       );
     },
     [update],
   );
 
-  const rescanLastPage = useCallback(
-    (id: string) => {
-      update((books) =>
-        books.map((b) => {
-          if (b.id !== id || b.pages.length === 0) return b;
-          const pages = b.pages.slice(0, -1);
-          pages.push(makePageImage(b, pages.length + 1));
-          return { ...b, pages };
-        }),
-      );
-    },
-    [update],
-  );
-
+  /** Replace the pages at the given 0-based indexes with a newly captured
+   * image. In practice this is always called with a single index at a time
+   * (one camera tap = one replaced page), but the array signature is kept
+   * in case batch replacement is ever useful. */
   const recapturePages = useCallback(
-    (id: string, pageIndexes: number[]) => {
+    (id: string, pageIndexes: number[], imageSrc: string) => {
       update((books) =>
         books.map((b) => {
           if (b.id !== id || pageIndexes.length === 0) return b;
           const indexSet = new Set(pageIndexes);
-          const pages = b.pages.map((src, i) =>
-            indexSet.has(i) ? makePageImage(b, i + 1) : src,
-          );
+          const pages = b.pages.map((src, i) => (indexSet.has(i) ? imageSrc : src));
           return { ...b, pages };
         }),
       );
@@ -93,7 +75,6 @@ export function useYearbooks() {
     books,
     claimBook,
     capturePage,
-    rescanLastPage,
     recapturePages,
     finishBook,
     resetBook,

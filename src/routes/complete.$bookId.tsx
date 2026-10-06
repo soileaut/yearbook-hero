@@ -42,7 +42,19 @@ function CompletePage() {
       const pageH = pdf.internal.pageSize.getHeight();
       book.pages.forEach((src, i) => {
         if (i > 0) pdf.addPage("letter", "portrait");
-        pdf.addImage(src, "JPEG", 0, 0, pageW, pageH);
+        // Fit the image within the page preserving its aspect ratio (like
+        // "contain", not "stretch") so pages of differing shapes don't come
+        // out distorted. White-fill first so the gutters read as page, not
+        // as a hole.
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, pageW, pageH, "F");
+        const { width: imgW, height: imgH } = pdf.getImageProperties(src);
+        const scale = Math.min(pageW / imgW, pageH / imgH);
+        const w = imgW * scale;
+        const h = imgH * scale;
+        const x = (pageW - w) / 2;
+        const y = (pageH - h) / 2;
+        pdf.addImage(src, "JPEG", x, y, w, h);
       });
       const slug = `${book.school.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${book.year}`;
       pdf.save(`${slug}-yearbook.pdf`);
