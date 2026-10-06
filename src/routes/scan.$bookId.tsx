@@ -66,6 +66,13 @@ function ScanPage() {
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          // Some mobile browsers/webviews don't reliably honor the autoPlay
+          // attribute alone, especially inside an embedded preview iframe.
+          videoRef.current.play().catch(() => {
+            // Autoplay can be blocked without user interaction in some
+            // contexts; the video element stays attached and playable once
+            // the user taps something, so this isn't fatal.
+          });
         }
         setCameraState("ready");
       } catch {
@@ -254,28 +261,33 @@ function ScanPage() {
           className="relative mt-6 w-full max-w-[220px] overflow-hidden rounded-2xl bg-black shadow-lg"
           style={{ aspectRatio: "612 / 792" }}
         >
-          {cameraState === "ready" ? (
-            <>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="h-full w-full object-cover"
-              />
-              {/* Alignment guide: box-shadow spread darkens everything
-                  outside this frame, showing where to position the page. */}
-              <div
-                className="pointer-events-none absolute inset-3 rounded-md border-2 border-dashed border-white/80"
-                style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)" }}
-              />
-            </>
-          ) : cameraState === "starting" ? (
-            <div className="flex h-full items-center justify-center px-4 text-center text-xs font-semibold text-white/70">
+          {/* Always mounted (never conditionally rendered) so the ref exists
+              before getUserMedia resolves — otherwise the stream has nothing
+              to attach to and the preview silently stays blank. */}
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className={`h-full w-full object-cover ${
+              cameraState === "ready" ? "" : "opacity-0"
+            }`}
+          />
+          {cameraState === "ready" && (
+            // Alignment guide: box-shadow spread darkens everything outside
+            // this frame, showing where to position the page.
+            <div
+              className="pointer-events-none absolute inset-3 rounded-md border-2 border-dashed border-white/80"
+              style={{ boxShadow: "0 0 0 9999px rgba(0,0,0,0.45)" }}
+            />
+          )}
+          {cameraState === "starting" && (
+            <div className="absolute inset-0 flex items-center justify-center px-4 text-center text-xs font-semibold text-white/70">
               Starting camera…
             </div>
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-xs font-semibold text-white/70">
+          )}
+          {cameraState === "unavailable" && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center text-xs font-semibold text-white/70">
               <Camera className="size-6" />
               Camera unavailable — tap below to choose a photo instead.
             </div>
