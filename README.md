@@ -1,20 +1,23 @@
 # Yearbook Hero
 
-Build a mobile-first web app (React, Vite, Tailwind, shadcn/ui) called "St. Louis Homeroom Archive" for a yearbook-scanning volunteer flow. No backend needed yet — use mock/local state, persisted to localStorage so a page refresh doesn't lose progress.
+An early interactive prototype of the volunteer-facing capture app described in the **St. Louis Homeroom Archive** proposal — built to make the concept tangible for proposal reviewers, not as production software.
 
-Primary color: a deep racing green; clean sans-serif typography.
+> **Demo only — not private, not production.** This link has no authentication and nothing uploaded is encrypted or access-controlled. Don't capture real names, personal information, or anything sensitive while testing. See `DEMO-OVERVIEW.md` in the main proposal repo for the full capability disclaimer.
 
-Screens:
+## What's implemented
 
-Home/Start — app name, short one-line mission, big "Start Scanning" button.
+- Claiming a yearbook from a missing-yearbooks registry
+- Live in-browser camera capture (`getUserMedia`) with an on-screen alignment guide
+- Rescanning a page mid-session, or recapturing specific pages after review
+- Real multi-page PDF generation from captured pages, downloadable on both desktop and mobile
+- Local-only persistence (browser storage) so progress survives a page refresh
 
-Missing Yearbooks Registry — a list/grid of yearbooks (mock data: school name, year, status badge: Unclaimed / In Progress / Done). Tapping an unclaimed one claims it and navigates to the scan screen.
+## What's intentionally simplified
 
-Scan Screen — shows claimed yearbook's title, a live page counter ("Page 12"), a large camera-capture button. Since there's no backend yet, each tap should add a placeholder page image (a simple generated canvas image with the page number rendered on it is fine) to a thumbnail strip at the bottom and increment the counter. Include a "Rescan last page" button (removes/replaces the last thumbnail) and a "Finish Book" button.
-
-Completion Screen — confirms the book is done, shows total pages captured, and includes a real "Download PDF" button that uses a client-side library (jsPDF or pdf-lib) to actually compile all the captured placeholder page images into a single multi-page PDF and download it. This is the one piece that should genuinely work, not just be mocked — the goal is to visually prove that a stack of captured page images becomes one real downloadable PDF. Also include a "Scan Another" button back to the registry.
-
-Keep the visual style clean and modern — this is for teenage student volunteers scanning in a school gym, so it should feel approachable, fast, and a little bit fun (progress/gamification touches welcome, e.g. a subtle page counter animation).
+- **No real edge detection** — pages are center-cropped to a fixed aspect ratio as a stand-in for genuine computer-vision page-boundary detection (the kind Apple's Notes app does when scanning a document).
+- **No backend** — everything lives in this browser only; no cloud storage, security scanning, or custody transfer, all of which are part of the real proposal's design.
+- **No multi-user sync** — the registry is local to whichever device/browser it's running on.
+- **No OCR, search, or per-name lookup** — deferred in the main proposal's scope as well.
 
 This project was built with [Lovable](https://lovable.dev).
 
