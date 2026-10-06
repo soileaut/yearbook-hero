@@ -10,33 +10,63 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as RegistryRouteImport } from './routes/registry'
+import { Route as CompleteBookIdRouteImport } from './routes/complete.$bookId'
+import { Route as ScanBookIdRouteImport } from './routes/scan.$bookId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RegistryRoute = RegistryRouteImport.update({
+  id: '/registry',
+  path: '/registry',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompleteBookIdRoute = CompleteBookIdRouteImport.update({
+  id: '/complete/$bookId',
+  path: '/complete/$bookId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScanBookIdRoute = ScanBookIdRouteImport.update({
+  id: '/scan/$bookId',
+  path: '/scan/$bookId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/registry': typeof RegistryRoute
+  '/complete/$bookId': typeof CompleteBookIdRoute
+  '/scan/$bookId': typeof ScanBookIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/registry': typeof RegistryRoute
+  '/complete/$bookId': typeof CompleteBookIdRoute
+  '/scan/$bookId': typeof ScanBookIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/registry': typeof RegistryRoute
+  '/complete/$bookId': typeof CompleteBookIdRoute
+  '/scan/$bookId': typeof ScanBookIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/registry' | '/complete/$bookId' | '/scan/$bookId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/registry' | '/complete/$bookId' | '/scan/$bookId'
+  id: '__root__' | '/' | '/registry' | '/complete/$bookId' | '/scan/$bookId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  RegistryRoute: typeof RegistryRoute
+  CompleteBookIdRoute: typeof CompleteBookIdRoute
+  ScanBookIdRoute: typeof ScanBookIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +78,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/registry': {
+      id: '/registry'
+      path: '/registry'
+      fullPath: '/registry'
+      preLoaderRoute: typeof RegistryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/complete/$bookId': {
+      id: '/complete/$bookId'
+      path: '/complete/$bookId'
+      fullPath: '/complete/$bookId'
+      preLoaderRoute: typeof CompleteBookIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scan/$bookId': {
+      id: '/scan/$bookId'
+      path: '/scan/$bookId'
+      fullPath: '/scan/$bookId'
+      preLoaderRoute: typeof ScanBookIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  RegistryRoute: RegistryRoute,
+  CompleteBookIdRoute: CompleteBookIdRoute,
+  ScanBookIdRoute: ScanBookIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
