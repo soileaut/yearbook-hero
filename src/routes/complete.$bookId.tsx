@@ -57,7 +57,20 @@ function CompletePage() {
         pdf.addImage(src, "JPEG", x, y, w, h);
       });
       const slug = `${book.school.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${book.year}`;
-      pdf.save(`${slug}-yearbook.pdf`);
+
+      // Explicit Blob + anchor download instead of pdf.save() — more
+      // reliable across mobile browsers/embedded webviews, which can
+      // otherwise intercept jsPDF's internal save mechanism and render the
+      // result as a single static image rather than a real multi-page PDF.
+      const blob = pdf.output("blob");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${slug}-yearbook.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } finally {
       setDownloading(false);
     }
