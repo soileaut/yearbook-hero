@@ -46,6 +46,12 @@ function HomePage() {
         <ScanLine className="size-6" />
         Start Scanning
       </Link>
+
+      <p className="mt-10 max-w-xs text-xs leading-relaxed text-muted-foreground">
+        This is an early demo, not the production archive. This link isn't
+        private — please don't capture real names, personal information, or
+        anything sensitive while testing.
+      </p>
     </div>
   );
 }
